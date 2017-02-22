@@ -44,10 +44,10 @@ byte ip[]     = { 192, 168, 1, 99 };
 //
 #define ONE_WIRE_BUS 6
 #define ONE_WIRE_BUS2 7
-int DEUR_PIN = 8;
-int DEUR_DETECT = 5;
+#define DEUR_PIN 8
+#define DEUR_DETECT 5
 int lastDeurState = HIGH;
-int WC_DETECT = 9;
+#define WC_DETECT 9
 
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(ONE_WIRE_BUS);
@@ -58,6 +58,7 @@ DallasTemperature sensors(&oneWire);
 DallasTemperature sensors2(&oneWire2);
 
 #define DEUR_OPEN_TOPIC "domogik/in/deur"
+#define intervalReading 40000L
 
 // Assign the unique addresses of your 1-Wire temp sensors.
 // See the tutorial on how to obtain these addresses:
@@ -201,9 +202,10 @@ void setup()
 
   //input
   pinMode(WC_DETECT, INPUT);
+  digitalWrite(WC_DETECT,LOW);
   // After setting up the button, setup the Bounce instance :
   debouncerWC.attach(WC_DETECT);
-  debouncerWC.interval(50);
+  debouncerWC.interval(10);
   
 
   //Install listeners and initialize Wiegand reader
@@ -241,7 +243,7 @@ void reconnect() {
   }
 }
 
-void printTemperature(DallasTemperature sensors, DeviceAddress deviceAddress, char const * topic, int ctr)
+void printTemperature(DallasTemperature sensors, DeviceAddress deviceAddress, char const * topic, float calibration, int ctr)
 {
   sensors.requestTemperatures();
   delay(1000);
@@ -249,7 +251,7 @@ void printTemperature(DallasTemperature sensors, DeviceAddress deviceAddress, ch
   float tempC = sensors.getTempC(deviceAddress);
   if (tempC == -127.00 or tempC < -15 or tempC > 59) {
     if (ctr < 3) {
-      printTemperature(sensors, deviceAddress, topic, ++ctr);
+      printTemperature(sensors, deviceAddress, topic, calibration, ++ctr);
     }
     else
     {
@@ -260,9 +262,11 @@ void printTemperature(DallasTemperature sensors, DeviceAddress deviceAddress, ch
   else {
     Serial.println(topic);
     Serial.println(tempC);
+    float tempCcalib = calibration + tempC;
+    Serial.println(tempCcalib);
     char buffer[12];
     char outstr[15];
-    dtostrf(tempC, 4, 2, outstr);
+    dtostrf(tempCcalib, 4, 2, outstr);
     client.publish(topic, outstr);
   }
 }
@@ -326,59 +330,59 @@ void loop()
   }
   debouncerWC.update();
 
-  if ( debouncerWC.fell() ) {
+  if ( debouncerWC.rose() ) {
     client.publish("domogik/wcdetect", "1");
     Serial.println(String("wc detect 1"));
 
   }
-  if ( debouncerWC.rose() ) {
+  if ( debouncerWC.fell() ) {
     client.publish("domogik/wcdetect", "0");
     Serial.println(String("wc detect 0"));
   }
 
   
-  if (count == 10000) {
-    printTemperature(sensors, thermometer7, "domogik/berging", 0);
+  if (count == 1 * intervalReading) {
+    printTemperature(sensors, thermometer7, "domogik/berging", 0.5, 0);
   }
-  if (count == 20000) {
-    printTemperature(sensors, thermometerT, "domogik/tempT", 0);
+  if (count == 2 * intervalReading) {
+    printTemperature(sensors, thermometerT, "domogik/tempT",0, 0);
     //second bus
   }
-  if (count == 30000) {
-    printTemperature(sensors2, thermometer5, "domogik/traponder", 0);
+  if (count == 3 * intervalReading) {
+    printTemperature(sensors2, thermometer5, "domogik/traponder", -0.4, 0);
   }
-  if (count == 40000) {
-    printTemperature(sensors2, thermometer10, "domogik/inkom", 0);//inkom
+  if (count == 4 * intervalReading) {
+    printTemperature(sensors2, thermometer10, "domogik/inkom",0, 0);//inkom
   }
-  if (count == 50000) {
-    printTemperature(sensors2, thermometer11, "domogik/wconder", 0);//wc onder
+  if (count == 5 * intervalReading) {
+    printTemperature(sensors2, thermometer11, "domogik/wconder",0.3, 0);//wc onder
   }
-  if (count == 60000) {
-    printTemperature(sensors2, thermometer9, "domogik/paulien", 0);//paulien
+  if (count == 6* intervalReading) {
+    printTemperature(sensors2, thermometer9, "domogik/paulien", 0, 0);//paulien
   }
-  if (count == 70000) {
-    printTemperature(sensors2, thermometer3, "domogik/wcboven", 0);//wc boven
+  if (count == 7 * intervalReading) {
+    printTemperature(sensors2, thermometer3, "domogik/wcboven",0.3, 0);//wc boven
   }
-  if (count == 80000) {
-    printTemperature(sensors2, thermometer4, "domogik/keuken", 0);
+  if (count == 8 * intervalReading) {
+    printTemperature(sensors2, thermometer4, "domogik/keuken",-0.8, 0);
   }
-  if (count == 90000) {
-    printTemperature(sensors2, thermometer12, "domogik/living", 0);
+  if (count == 9 * intervalReading) {
+    printTemperature(sensors2, thermometer12, "domogik/living",0.2, 0);
   }
-  if (count == 100000) {
-    printTemperature(sensors2, thermometer6, "domogik/trapboven", 0);
+  if (count == 10 * intervalReading) {
+    printTemperature(sensors2, thermometer6, "domogik/trapboven",0.4, 0);
   }
-  if (count == 110000) {
-    printTemperature(sensors2, thermometer13, "domogik/slpkberg", 0);
+  if (count == 11 * intervalReading) {
+    printTemperature(sensors2, thermometer13, "domogik/slpkberg",0, 0);
   }
-  if (count == 120000) {
-    printTemperature(sensors2, thermometer15, "domogik/badk", 0);
+  if (count == 12 * intervalReading) {
+    printTemperature(sensors2, thermometer15, "domogik/badk",0.8, 0);
   }
-  if (count == 130000) {
-    printTemperature(sensors2, thermometer16, "domogik/vide", 0);
+  if (count == 13 * intervalReading) {
+    printTemperature(sensors2, thermometer16, "domogik/vide",1.65, 0);
   }
-  if (count == 140000) {
-    printTemperature(sensors2, thermometer14, "domogik/masterslpk", 0);
+  if (count == 14 * intervalReading) {
+    printTemperature(sensors2, thermometer14, "domogik/masterslpk",0.3, 0);
     count = 0;
   }
 
