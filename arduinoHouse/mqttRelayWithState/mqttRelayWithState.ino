@@ -1,6 +1,6 @@
 
 /*
- * MQTT 32 output pins for driving 2 16-switches relayboards on an arduino mega with ethernet shield.
+ * MQTT 32 output pins for driving 2 16-channel relay boards on an arduino mega with ethernet shield.
  * 
  * NOTE: the topic is hardcoded: domogik/in/relay/r + relay number : e.g
  * 
@@ -42,11 +42,11 @@ const char* outTopic = "domogik/relayClient";
 const char* inTopic = "domogik/in/relay/#";
 
 bool relayStates[] = {
-  LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW, LOW
+  HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH
 };
 
 int relayPins[] = {
-  22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 21, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53
+  22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53
 };       // an array of pin numbers to which LEDs are attached
 int pinCount = 32;
 
@@ -69,20 +69,16 @@ void setup_ethernet() {
 void switchRelay(byte* payload, int pos) {
   // Switch on the LED if an 1 was received as first character
   if ((char)payload[0] == '0') {
-    digitalWrite(relayPins[pos], LOW);   // Turn the LED on (Note that LOW is the voltage level
-    Serial.println("relay_pin -> LOW");
-    relayStates[pos] = LOW;
+    digitalWrite(relayPins[pos], HIGH);   
+    relayStates[pos] = HIGH;
     EEPROM.update(pos, relayStates[pos]);    // Write state to EEPROM
   } else if ((char)payload[0] == '1') {
-    digitalWrite(relayPins[pos], HIGH);  // Turn the LED off by making the voltage HIGH
-    Serial.println("relay_pin -> HIGH");
-    relayStates[pos] = HIGH;
+    digitalWrite(relayPins[pos], LOW);  
+    relayStates[pos] = LOW;
     EEPROM.update(pos, relayStates[pos]);    // Write state to EEPROM
   } else if ((char)payload[0] == '2') {
     relayStates[pos] = !relayStates[pos];
-    digitalWrite(relayPins[pos], relayStates[pos]);  // Turn the LED off by making the voltage HIGH
-    Serial.print("relay_pin -> switched to ");
-    Serial.println(relayStates[pos]);
+    digitalWrite(relayPins[pos], relayStates[pos]); 
     EEPROM.update(pos, relayStates[pos]);    // Write state to EEPROM
   }
 }
