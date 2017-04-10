@@ -4,4 +4,5 @@ OneWire temp sensors, Wiegand rfid reader, some simple input detect and a relayb
 
 # mqttRelayWithState
 2 16-channel relay boards on an arduino mega with ethernet shield
-![alt text](https://github.com/jschaeke/arduinoHouse/blob/master/16-channel-relayboard_on_mega.jpg?raw=true “Arduino mega with a 16 channel relay board hooked up“)
+
+![16-channel-relayboard_on_mega](https://cloud.githubusercontent.com/assets/13959340/24881372/da771ec8-1e3d-11e7-9f09-d21f6bddab4c.jpg)
