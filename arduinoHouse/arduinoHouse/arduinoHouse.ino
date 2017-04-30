@@ -21,6 +21,8 @@
 #include "OneWire.h"
 #include "DallasTemperature.h"
 #include <Wiegand.h>
+// include the AnalogMultiButton library
+#include <AnalogMultiButton.h>
 
 #include <Bounce2.h>
 
@@ -48,6 +50,22 @@ byte ip[]     = { 192, 168, 1, 99 };
 #define DEUR_DETECT 5
 int lastDeurState = HIGH;
 #define WC_DETECT 9
+
+// 5V --> 2.4K resistor --> A0  --> BUTTON_AN1 --> GND
+//                              |--> 1.2K resistor --> BUTTON_AN2 --> GND
+//                                                |--> 1.2K resistor --> BUTTON_AN3 --> GND
+const int BUTTONS_PIN = A0;
+// set how many buttons you have connected
+const int BUTTONS_TOTAL = 3;
+// find out what the value of analogRead is when you press each of your buttons and put them in this array
+// you can find this out by putting Serial.println(analogRead(BUTTONS_PIN)); in your loop() and opening the serial monitor to see the values
+// make sure they are in order of smallest to largest
+const int BUTTONS_VALUES[BUTTONS_TOTAL] = {0, 340, 508};
+const int BUTTON_AN1 = 0;
+const int BUTTON_AN2 = 1;
+const int BUTTON_AN3 = 2;
+// make an AnalogMultiButton object, pass in the pin, total and values array
+AnalogMultiButton buttons(BUTTONS_PIN, BUTTONS_TOTAL, BUTTONS_VALUES);
 
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(ONE_WIRE_BUS);
@@ -202,11 +220,11 @@ void setup()
 
   //input
   pinMode(WC_DETECT, INPUT);
-  digitalWrite(WC_DETECT,LOW);
+  digitalWrite(WC_DETECT, LOW);
   // After setting up the button, setup the Bounce instance :
   debouncerWC.attach(WC_DETECT);
   debouncerWC.interval(10);
-  
+
 
   //Install listeners and initialize Wiegand reader
   wiegand.onReceive(receivedData, "Card readed: ");
@@ -255,7 +273,6 @@ void printTemperature(DallasTemperature sensors, DeviceAddress deviceAddress, ch
     }
     else
     {
-
       Serial.println(String("Error reading:").concat(topic));
     }
   }
@@ -294,7 +311,7 @@ void receivedData(uint8_t* data, uint8_t bits, const char* message) {
   for (int i = 0; i < bytes; i++) {
     code = (code * 1000) + data[i];
   }
-  
+
   Serial.println();
   char buf[15];
   //ex readout : 113086150
@@ -340,49 +357,73 @@ void loop()
     Serial.println(String("wc detect 0"));
   }
 
-  
+  if (buttons.onPress(BUTTON_AN1))
+  {
+    client.publish("domogik/buttonan1", "1");
+  }
+  if (buttons.onRelease(BUTTON_AN1))
+  {
+    client.publish("domogik/buttonan1", "0");
+  }
+  if (buttons.onPress(BUTTON_AN2))
+  {
+    client.publish("domogik/buttonan2", "1");
+  }
+  if (buttons.onRelease(BUTTON_AN2))
+  {
+    client.publish("domogik/buttonan2", "0");
+  }
+  if (buttons.onPress(BUTTON_AN3))
+  {
+    client.publish("domogik/buttonan3", "1");
+  }
+  if (buttons.onRelease(BUTTON_AN3))
+  {
+    client.publish("domogik/buttonan3", "0");
+  }
+
   if (count == 1 * intervalReading) {
     printTemperature(sensors, thermometer7, "domogik/berging", 0.5, 0);
   }
   if (count == 2 * intervalReading) {
-    printTemperature(sensors, thermometerT, "domogik/tempT",0, 0);
+    printTemperature(sensors, thermometerT, "domogik/tempT", 0, 0);
     //second bus
   }
   if (count == 3 * intervalReading) {
     printTemperature(sensors2, thermometer5, "domogik/traponder", -0.4, 0);
   }
   if (count == 4 * intervalReading) {
-    printTemperature(sensors2, thermometer10, "domogik/inkom",0, 0);//inkom
+    printTemperature(sensors2, thermometer10, "domogik/inkom", 0, 0); //inkom
   }
   if (count == 5 * intervalReading) {
-    printTemperature(sensors2, thermometer11, "domogik/wconder",0.3, 0);//wc onder
+    printTemperature(sensors2, thermometer11, "domogik/wconder", 0.3, 0); //wc onder
   }
-  if (count == 6* intervalReading) {
+  if (count == 6 * intervalReading) {
     printTemperature(sensors2, thermometer9, "domogik/paulien", 0, 0);//paulien
   }
   if (count == 7 * intervalReading) {
-    printTemperature(sensors2, thermometer3, "domogik/wcboven",0.3, 0);//wc boven
+    printTemperature(sensors2, thermometer3, "domogik/wcboven", 0.3, 0); //wc boven
   }
   if (count == 8 * intervalReading) {
-    printTemperature(sensors2, thermometer4, "domogik/keuken",-0.8, 0);
+    printTemperature(sensors2, thermometer4, "domogik/keuken", -0.8, 0);
   }
   if (count == 9 * intervalReading) {
-    printTemperature(sensors2, thermometer12, "domogik/living",0.2, 0);
+    printTemperature(sensors2, thermometer12, "domogik/living", 0.2, 0);
   }
   if (count == 10 * intervalReading) {
-    printTemperature(sensors2, thermometer6, "domogik/trapboven",0.4, 0);
+    printTemperature(sensors2, thermometer6, "domogik/trapboven", 0.4, 0);
   }
   if (count == 11 * intervalReading) {
-    printTemperature(sensors2, thermometer13, "domogik/slpkberg",0, 0);
+    printTemperature(sensors2, thermometer13, "domogik/slpkberg", 0, 0);
   }
   if (count == 12 * intervalReading) {
-    printTemperature(sensors2, thermometer15, "domogik/badk",0.8, 0);
+    printTemperature(sensors2, thermometer15, "domogik/badk", 0.8, 0);
   }
   if (count == 13 * intervalReading) {
-    printTemperature(sensors2, thermometer16, "domogik/vide",1.65, 0);
+    printTemperature(sensors2, thermometer16, "domogik/vide", 1.65, 0);
   }
   if (count == 14 * intervalReading) {
-    printTemperature(sensors2, thermometer14, "domogik/masterslpk",0.3, 0);
+    printTemperature(sensors2, thermometer14, "domogik/masterslpk", 0.3, 0);
     count = 0;
   }
 

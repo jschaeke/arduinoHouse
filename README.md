@@ -1,6 +1,6 @@
 # arduinoHouse
 For an Arduino Uno with ethernet shield:
-OneWire temp sensors, Wiegand rfid reader, some simple input detect and a relayboard all subscribed on an MQTT broker.
+OneWire temp sensors, Wiegand rfid reader, digital+analog button press detection and a relay board subscribed on an MQTT broker.
 
 # mqttRelayWithState
 2 16-channel relay boards on an arduino mega with ethernet shield
