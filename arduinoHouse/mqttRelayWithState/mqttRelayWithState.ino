@@ -38,8 +38,14 @@ long lastMsg = 0;
 char msg[50];
 int value = 0;
 
+//MutuallyExclude on state between pairs of relays (for shutter to prevent up and down at the same time)
+//ask R1 to turn on while R2 = on -> turns off R2 first (and broadcasts 'domogik/in/relay/r2 0')
+//ask R2 to turn on while R1 = on -> turns off R1 first (and broadcasts 'domogik/in/relay/r1 0')
+bool isMutuallyExclude = true;
+
 const char* outTopic = "domogik/relayClient";
 const char* inTopic = "domogik/in/relay/#";
+const char* outRelayTopic = "domogik/in/relay/r";
 
 bool relayStates[] = {
   HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH
@@ -66,21 +72,44 @@ void setup_ethernet() {
 
 }
 
-void switchRelay(byte* payload, int pos) {
+void switchRelay(char* switchState, int pos) {
   // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '0') {
+  if (switchState == '0') {
     digitalWrite(relayPins[pos], HIGH);   
     relayStates[pos] = HIGH;
     EEPROM.update(pos, relayStates[pos]);    // Write state to EEPROM
-  } else if ((char)payload[0] == '1') {
+  } else if (switchState == '1') {
     digitalWrite(relayPins[pos], LOW);  
     relayStates[pos] = LOW;
     EEPROM.update(pos, relayStates[pos]);    // Write state to EEPROM
-  } else if ((char)payload[0] == '2') {
-    relayStates[pos] = !relayStates[pos];
-    digitalWrite(relayPins[pos], relayStates[pos]); 
-    EEPROM.update(pos, relayStates[pos]);    // Write state to EEPROM
-  }
+  } 
+}
+
+void mutuallyExcludePair(char* switchState, int pos){
+  if (pos % 2 == 0 && switchState == '1') //even
+   {
+     if (pinCount > (pos + 1) && relayStates[pos + 1] == LOW){
+      switchRelay('0', pos + 1);
+      char outputTopicBuff[100];
+      strcpy(outputTopicBuff,outRelayTopic);
+      char relaybuffer[5];
+      sprintf(relaybuffer, "%d", pos + 2);
+      strcat(outputTopicBuff,relaybuffer);
+      client.publish(outputTopicBuff, "0");
+     }
+   }
+  else if (pos % 2 == 1 && switchState == '1') //odd
+   {
+     if ((pos - 1) >= 0 && relayStates[pos - 1] == LOW){
+      switchRelay('0', pos - 1);
+      char outputTopicBuff[100];
+      strcpy(outputTopicBuff,outRelayTopic);
+      char relaybuffer[5];
+      sprintf(relaybuffer, "%d", pos);
+      strcat(outputTopicBuff,relaybuffer);
+      client.publish(outputTopicBuff, "0");
+     }
+   } 
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -95,8 +124,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
   String topicString = String(topic);
   int relayNumber = topicString.substring(18, 20).toInt();
   int posInArray = relayNumber - 1;
+  char* switchState = (char)payload[0];
 
-  switchRelay(payload, posInArray);
+  if (switchState == '2') {
+    if (relayStates[posInArray] == HIGH){
+      switchState = '1';
+    }
+    else {
+      switchState = '0';
+    }
+  }
+
+  if (isMutuallyExclude){
+   mutuallyExcludePair(switchState, posInArray);
+  }
+  switchRelay(switchState, posInArray);
 
 }
 
