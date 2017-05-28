@@ -38,7 +38,7 @@ long lastMsg = 0;
 char msg[50];
 int value = 0;
 
-//MutuallyExclude on state between pairs of relays (for shutter to prevent up and down at the same time)
+//MutuallyExclude the 'on' state between pairs of relays (for shutter to prevent up and down at the same time)
 //ask R1 to turn on while R2 = on -> turns off R2 first (and broadcasts 'domogik/in/relay/r2 0')
 //ask R2 to turn on while R1 = on -> turns off R1 first (and broadcasts 'domogik/in/relay/r1 0')
 bool isMutuallyExclude = true;
