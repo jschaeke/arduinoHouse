@@ -1,16 +1,16 @@
 
 /*
- * MQTT 32 output pins for driving 2 16-channel relay boards on an arduino mega with ethernet shield.
- * 
- * NOTE: the topic is hardcoded: domogik/in/relay/r + relay number : e.g
- * 
- * mosquitto_pub -t domogik/in/relay/r1 -m 1  -> turn on
- * mosquitto_pub -t domogik/in/relay/r1 -m 0  -> turn off
- * mosquitto_pub -t domogik/in/relay/r1 -m 2  -> toggle; so turn on again
- * 
+   MQTT 32 output pins for driving 2 16-channel relay boards on an arduino mega with ethernet shield.
+
+   NOTE: the topic is hardcoded: domogik/in/relay/r + relay number : e.g
+
+   mosquitto_pub -t domogik/in/relay/r1 -m 1  -> turn on
+   mosquitto_pub -t domogik/in/relay/r1 -m 0  -> turn off
+   mosquitto_pub -t domogik/in/relay/r1 -m 2  -> toggle; so turn on again
+
   By Jeroen Schaeken
   Derived from http://www.esp8266.com/viewtopic.php?f=29&t=8746
-  
+
   It connects to an MQTT server then:
   - on 0 switches off relay
   - on 1 switches on relay
@@ -75,41 +75,40 @@ void setup_ethernet() {
 void switchRelay(char* switchState, int pos) {
   // Switch on the LED if an 1 was received as first character
   if (switchState == '0') {
-    digitalWrite(relayPins[pos], HIGH);   
+    digitalWrite(relayPins[pos], HIGH);
     relayStates[pos] = HIGH;
     EEPROM.update(pos, relayStates[pos]);    // Write state to EEPROM
   } else if (switchState == '1') {
-    digitalWrite(relayPins[pos], LOW);  
+    digitalWrite(relayPins[pos], LOW);
     relayStates[pos] = LOW;
     EEPROM.update(pos, relayStates[pos]);    // Write state to EEPROM
-  } 
+  }
 }
 
-void mutuallyExcludePair(char* switchState, int pos){
+void publishRelayState(int relayNbr, char* state) {
+  char outputTopicBuff[100];
+  strcpy(outputTopicBuff, outRelayTopic);
+  char relaybuffer[5];
+  sprintf(relaybuffer, "%d", relayNbr);
+  strcat(outputTopicBuff, relaybuffer);
+  client.publish(outputTopicBuff, state);
+}
+
+void mutuallyExcludePair(char* switchState, int pos) {
   if (pos % 2 == 0 && switchState == '1') //even
-   {
-     if (pinCount > (pos + 1) && relayStates[pos + 1] == LOW){
+  {
+    if (pinCount > (pos + 1) && relayStates[pos + 1] == LOW) {
       switchRelay('0', pos + 1);
-      char outputTopicBuff[100];
-      strcpy(outputTopicBuff,outRelayTopic);
-      char relaybuffer[5];
-      sprintf(relaybuffer, "%d", pos + 2);
-      strcat(outputTopicBuff,relaybuffer);
-      client.publish(outputTopicBuff, "0");
-     }
-   }
+      publishRelayState(pos + 2, "0");
+    }
+  }
   else if (pos % 2 == 1 && switchState == '1') //odd
-   {
-     if ((pos - 1) >= 0 && relayStates[pos - 1] == LOW){
+  {
+    if ((pos - 1) >= 0 && relayStates[pos - 1] == LOW) {
       switchRelay('0', pos - 1);
-      char outputTopicBuff[100];
-      strcpy(outputTopicBuff,outRelayTopic);
-      char relaybuffer[5];
-      sprintf(relaybuffer, "%d", pos);
-      strcat(outputTopicBuff,relaybuffer);
-      client.publish(outputTopicBuff, "0");
-     }
-   } 
+      publishRelayState(pos, "0");
+    }
+  }
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -127,7 +126,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   char* switchState = (char)payload[0];
 
   if (switchState == '2') {
-    if (relayStates[posInArray] == HIGH){
+    if (relayStates[posInArray] == HIGH) {
       switchState = '1';
     }
     else {
@@ -135,8 +134,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
   }
 
-  if (isMutuallyExclude){
-   mutuallyExcludePair(switchState, posInArray);
+  if (isMutuallyExclude) {
+    mutuallyExcludePair(switchState, posInArray);
   }
   switchRelay(switchState, posInArray);
 
@@ -147,6 +146,10 @@ void reconnect() {
     if (client.connect("RelayboardClient")) {
       Serial.println("connected");
       client.publish(outTopic, "RelayBoard booted");
+      for (int thisPin = 0; thisPin < pinCount; thisPin++) {
+        char* state = relayStates[thisPin] == HIGH ? "0" : "1";
+        publishRelayState(thisPin + 1, state);
+      }
       client.subscribe(inTopic);
     } else {
       Serial.print("failed, rc=");
@@ -176,13 +179,13 @@ void setup() {
     digitalWrite(relayPins[thisPin], relayStates[thisPin]);
   }
 
-  digitalWrite(13, LOW);     
+  digitalWrite(13, LOW);
   delay(500);
   digitalWrite(13, HIGH);
   delay(500);
 
   Serial.begin(115200);
-  setup_ethernet();                   
+  setup_ethernet();
   client.setServer(server, 1883);
   client.setCallback(callback);
 }
