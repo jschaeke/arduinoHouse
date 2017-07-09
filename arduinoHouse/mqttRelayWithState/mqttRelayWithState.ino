@@ -22,10 +22,13 @@
 
   The current state is stored in EEPROM and restored on bootup
 
+  Pins 2->7 are used as input (switch) detection. Their state are published on domogik/relayArduinoPin1
+
 */
 #include <Ethernet.h>
 #include <PubSubClient.h>
 #include <EEPROM.h>
+#include <Bounce2.h>
 
 // Update these with values suitable for your network.
 byte mac[]    = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEE };
@@ -46,6 +49,7 @@ bool isMutuallyExclude = true;
 const char* outTopic = "domogik/relayClient";
 const char* inTopic = "domogik/in/relay/#";
 const char* outRelayTopic = "domogik/in/relay/r";
+const char* outPinTopic = "domogik/relayArduinoPin";
 
 bool relayStates[] = {
   HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH
@@ -55,6 +59,20 @@ int relayPins[] = {
   22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53
 };       // an array of pin numbers to which LEDs are attached
 int pinCount = 32;
+
+#define PIN_DETECT_1 2
+#define PIN_DETECT_2 3
+#define PIN_DETECT_3 4
+#define PIN_DETECT_4 5
+#define PIN_DETECT_5 6
+#define PIN_DETECT_6 7
+Bounce debounce1 = Bounce();
+Bounce debounce2 = Bounce();
+Bounce debounce3 = Bounce();
+Bounce debounce4 = Bounce();
+Bounce debounce5 = Bounce();
+Bounce debounce6 = Bounce();
+
 
 void setup_ethernet() {
 
@@ -90,6 +108,15 @@ void publishRelayState(int relayNbr, char* state) {
   strcpy(outputTopicBuff, outRelayTopic);
   char relaybuffer[5];
   sprintf(relaybuffer, "%d", relayNbr);
+  strcat(outputTopicBuff, relaybuffer);
+  client.publish(outputTopicBuff, state);
+}
+
+void publishPinState(int pinNbr, char* state) {
+  char outputTopicBuff[100];
+  strcpy(outputTopicBuff, outPinTopic);
+  char relaybuffer[5];
+  sprintf(relaybuffer, "%d", pinNbr);
   strcat(outputTopicBuff, relaybuffer);
   client.publish(outputTopicBuff, state);
 }
@@ -179,6 +206,28 @@ void setup() {
     digitalWrite(relayPins[thisPin], relayStates[thisPin]);
   }
 
+
+  //input
+  pinMode(PIN_DETECT_1, INPUT_PULLUP);
+  pinMode(PIN_DETECT_2, INPUT_PULLUP);
+  pinMode(PIN_DETECT_3, INPUT_PULLUP);
+  pinMode(PIN_DETECT_4, INPUT_PULLUP);
+  pinMode(PIN_DETECT_5, INPUT_PULLUP);
+  pinMode(PIN_DETECT_6, INPUT_PULLUP);
+  debounce1.attach(PIN_DETECT_1);
+  debounce2.attach(PIN_DETECT_2);
+  debounce3.attach(PIN_DETECT_3);
+  debounce4.attach(PIN_DETECT_4);
+  debounce5.attach(PIN_DETECT_5);
+  debounce6.attach(PIN_DETECT_6);
+  debounce1.interval(50);
+  debounce2.interval(50);
+  debounce3.interval(50);
+  debounce4.interval(50);
+  debounce5.interval(50);
+  debounce6.interval(50);
+
+
   digitalWrite(13, LOW);
   delay(500);
   digitalWrite(13, HIGH);
@@ -195,6 +244,49 @@ void loop() {
   if (!client.connected()) {
     reconnect();
   }
+  debounce1.update();
+  if ( debounce1.fell() ) {
+    publishPinState(1, "1");
+  }
+  if ( debounce1.rose() ) {
+    publishPinState(1, "0");
+  }
+  debounce2.update();
+  if ( debounce2.fell() ) {
+    publishPinState(2, "1");
+  }
+  if ( debounce2.rose() ) {
+    publishPinState(2, "0");
+  }
+  debounce3.update();
+  if ( debounce3.fell() ) {
+    publishPinState(3, "1");
+  }
+  if ( debounce3.rose() ) {
+    publishPinState(3, "0");
+  }
+  debounce4.update();
+  if ( debounce4.fell() ) {
+    publishPinState(4, "1");
+  }
+  if ( debounce4.rose() ) {
+    publishPinState(4, "0");
+  }
+  debounce5.update();
+  if ( debounce5.fell() ) {
+    publishPinState(5, "1");
+  }
+  if ( debounce5.rose() ) {
+    publishPinState(5, "0");
+  }
+  debounce6.update();
+  if ( debounce6.fell() ) {
+    publishPinState(6, "1");
+  }
+  if ( debounce6.rose() ) {
+    publishPinState(6, "0");
+  }
+
   client.loop();
 }
 
