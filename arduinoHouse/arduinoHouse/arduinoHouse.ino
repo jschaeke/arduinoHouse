@@ -420,7 +420,7 @@ void loop()
     printTemperature(sensors2, thermometer15, "domogik/badk", 0.8, 0);
   }
   if (count == 13 * intervalReading) {
-    printTemperature(sensors2, thermometer16, "domogik/vide", 1.65, 0);
+    printTemperature(sensors2, thermometer16, "domogik/vide", 0, 0);
   }
   if (count == 14 * intervalReading) {
     printTemperature(sensors2, thermometer14, "domogik/masterslpk", 0.3, 0);
