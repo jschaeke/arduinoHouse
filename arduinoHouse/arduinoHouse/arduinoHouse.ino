@@ -25,6 +25,8 @@
 #include <AnalogMultiButton.h>
 
 #include <Bounce2.h>
+#include <AsyncDelay.h>
+
 
 // These are the pins connected to the Wiegand D0 and D1 signals.
 // Ensure your board supports external Interruptions on these pins
@@ -37,6 +39,8 @@ Wiegand wiegand;
 Bounce debouncerDeur = Bounce();
 Bounce debouncerWC = Bounce();
 
+AsyncDelay delay_8s;
+AsyncDelay delay_10s;
 
 // Update these with values suitable for your network.
 byte mac[]    = {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, 0xED };
@@ -76,7 +80,8 @@ DallasTemperature sensors(&oneWire);
 DallasTemperature sensors2(&oneWire2);
 
 #define DEUR_OPEN_TOPIC "domogik/in/deur"
-#define intervalReading 40000L
+bool isNextReadSensors = true;
+bool isNextReadSensors2 = false;
 
 // Assign the unique addresses of your 1-Wire temp sensors.
 // See the tutorial on how to obtain these addresses:
@@ -146,7 +151,6 @@ PubSubClient client(server, 1883, callback, ethClient);
 
 
 void openDoor(char const * topic) {
-  Serial.println("sesam open u");
   digitalWrite(DEUR_PIN, LOW);
   delay(1500);
   digitalWrite(DEUR_PIN, HIGH);
@@ -163,13 +167,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
   Serial.println(); // See more at: http://www.esp8266.com/viewtopic.php?f=29&t=8746#sthash.73Btjb9a.dpuf
   Serial.println((char)payload[0]);
-  if (String(topic).equals(DEUR_OPEN_TOPIC)) {
+  if (strcmp(topic, DEUR_OPEN_TOPIC) == 0) {
     if ((char)payload[0] == '1') {
       openDoor(topic);
     }
 
     if ((char)payload[0] == '0') {
-      Serial.println("Sesam sluit");
       digitalWrite(DEUR_PIN, HIGH);
     }
   }
@@ -239,6 +242,8 @@ void setup()
 
   //Sends the initial pin state to the Wiegand library
   pinStateChanged();
+  delay_8s.start(8000, AsyncDelay::MILLIS);
+  delay_10s.start(10000, AsyncDelay::MILLIS);
 }
 
 void reconnect() {
@@ -263,17 +268,10 @@ void reconnect() {
 
 void printTemperature(DallasTemperature sensors, DeviceAddress deviceAddress, char const * topic, float calibration, int ctr)
 {
-  sensors.requestTemperatures();
-  delay(1000);
-
   float tempC = sensors.getTempC(deviceAddress);
   if (tempC == -127.00 or tempC < -15 or tempC > 59) {
     if (ctr < 3) {
       printTemperature(sensors, deviceAddress, topic, calibration, ++ctr);
-    }
-    else
-    {
-      Serial.println(String("Error reading:").concat(topic));
     }
   }
   else {
@@ -294,7 +292,7 @@ void pinStateChanged() {
   wiegand.setPin1State(digitalRead(PIN_D1));
 }
 
-long count = 0;
+int tempSensorReads = 0;
 
 // Notifies when a reader has been connected or disconnected.
 // Instead of a message, the seconds parameter can be anything you want -- Whatever you specify on `wiegand.onStateChange()`
@@ -304,20 +302,14 @@ void stateChanged(bool plugged, const char* message) {
 }
 
 void receivedData(uint8_t* data, uint8_t bits, const char* message) {
-  Serial.print(message);
-
   uint8_t bytes = (bits + 7) / 8;
   long code = 0;
   for (int i = 0; i < bytes; i++) {
     code = (code * 1000) + data[i];
   }
-
-  Serial.println();
   char buf[15];
   //ex readout : 113086150
   ltoa(code, buf, 10);
-  Serial.println(buf);
-  String strCode = String(buf);
   client.publish("domogik/cardreader", buf);
 }
 
@@ -338,23 +330,17 @@ void loop()
 
   if ( debouncerDeur.fell() ) {
     client.publish("domogik/deurdetect", "1");
-    Serial.println(String("deur detect 1"));
-
   }
   if ( debouncerDeur.rose() ) {
     client.publish("domogik/deurdetect", "0");
-    Serial.println(String("deur detect 0"));
   }
   debouncerWC.update();
 
   if ( debouncerWC.rose() ) {
     client.publish("domogik/wcdetect", "1");
-    Serial.println(String("wc detect 1"));
-
   }
   if ( debouncerWC.fell() ) {
     client.publish("domogik/wcdetect", "0");
-    Serial.println(String("wc detect 0"));
   }
 
   if (buttons.onPress(BUTTON_AN1))
@@ -382,52 +368,78 @@ void loop()
     client.publish("domogik/buttonan3", "0");
   }
 
-  if (count == 1 * intervalReading) {
-    printTemperature(sensors, thermometer7, "domogik/berging", 0.5, 0);
+  if (delay_8s.isExpired()) {
+    if (isNextReadSensors){
+      sensors.requestTemperatures();
+      isNextReadSensors = false;
+    }
+    if (isNextReadSensors2){
+      sensors2.requestTemperatures();
+      isNextReadSensors2 = false;
+    }
+    delay_8s.repeat(); // Count from when the delay expired, not now
   }
-  if (count == 2 * intervalReading) {
-    printTemperature(sensors, thermometerT, "domogik/tempT", 0, 0);
-    //second bus
+  if (delay_10s.isExpired()) {
+    tempSensorReads = tempSensorReads + 1;
+    int currentTempSensor = tempSensorReads % 13;
+    //char buffer[7];         //the ASCII of the integer will be stored in this char array
+    //itoa(currentTempSensor,buffer,10);
+    //client.publish("domogik/currentTempSensor", buffer);
+    switch (currentTempSensor) {
+    case 0:
+      printTemperature(sensors, thermometer7, "domogik/berging", 0.5, 0);
+      isNextReadSensors = true;
+      break;
+    case 1:
+      printTemperature(sensors, thermometerT, "domogik/tempT", 0, 0);
+      isNextReadSensors2 = true;
+      break;
+    case 2:
+      printTemperature(sensors2, thermometer5, "domogik/traponder", -0.4, 0);
+      isNextReadSensors2 = true;
+      break;
+    case 3:
+      printTemperature(sensors2, thermometer10, "domogik/inkom", 0, 0); //inkom
+      isNextReadSensors2 = true;
+      break;
+    case 4:
+      printTemperature(sensors2, thermometer11, "domogik/wconder", 0.3, 0); //wc onder
+      isNextReadSensors2 = true;
+      break;
+    case 5:
+      printTemperature(sensors2, thermometer9, "domogik/paulien", 0, 0);//paulien
+      isNextReadSensors2 = true;
+      break;
+    case 6:
+      printTemperature(sensors2, thermometer3, "domogik/wcboven", 0.3, 0); //wc boven
+      isNextReadSensors2 = true;
+      break;
+    case 7:
+      printTemperature(sensors2, thermometer12, "domogik/living", 0.2, 0);
+      isNextReadSensors2 = true;
+      break;
+    case 8:
+      printTemperature(sensors2, thermometer6, "domogik/trapboven", 0.4, 0);
+      break;
+    case 9:
+      printTemperature(sensors2, thermometer13, "domogik/slpkberg", 0, 0);
+      isNextReadSensors2 = true;
+      break;
+    case 10:
+      printTemperature(sensors2, thermometer15, "domogik/badk", 0.8, 0);
+      isNextReadSensors2 = true;
+      break;
+    case 11:
+      printTemperature(sensors2, thermometer16, "domogik/vide", 0, 0);
+      isNextReadSensors2 = true;
+      break;
+    case 12:
+      printTemperature(sensors2, thermometer14, "domogik/masterslpk", 0.3, 0);
+      isNextReadSensors = true;
+      break;                            
+    }
+    delay_10s.repeat();
   }
-  if (count == 3 * intervalReading) {
-    printTemperature(sensors2, thermometer5, "domogik/traponder", -0.4, 0);
-  }
-  if (count == 4 * intervalReading) {
-    printTemperature(sensors2, thermometer10, "domogik/inkom", 0, 0); //inkom
-  }
-  if (count == 5 * intervalReading) {
-    printTemperature(sensors2, thermometer11, "domogik/wconder", 0.3, 0); //wc onder
-  }
-  if (count == 6 * intervalReading) {
-    printTemperature(sensors2, thermometer9, "domogik/paulien", 0, 0);//paulien
-  }
-  if (count == 7 * intervalReading) {
-    printTemperature(sensors2, thermometer3, "domogik/wcboven", 0.3, 0); //wc boven
-  }
-  if (count == 8 * intervalReading) {
-    printTemperature(sensors2, thermometer4, "domogik/keuken", -0.8, 0);
-  }
-  if (count == 9 * intervalReading) {
-    printTemperature(sensors2, thermometer12, "domogik/living", 0.2, 0);
-  }
-  if (count == 10 * intervalReading) {
-    printTemperature(sensors2, thermometer6, "domogik/trapboven", 0.4, 0);
-  }
-  if (count == 11 * intervalReading) {
-    printTemperature(sensors2, thermometer13, "domogik/slpkberg", 0, 0);
-  }
-  if (count == 12 * intervalReading) {
-    printTemperature(sensors2, thermometer15, "domogik/badk", 0.8, 0);
-  }
-  if (count == 13 * intervalReading) {
-    printTemperature(sensors2, thermometer16, "domogik/vide", 0, 0);
-  }
-  if (count == 14 * intervalReading) {
-    printTemperature(sensors2, thermometer14, "domogik/masterslpk", 0.3, 0);
-    count = 0;
-  }
-
-  count = count + 1;
   client.loop();
 }
 
