@@ -39,8 +39,10 @@ Wiegand wiegand;
 Bounce debouncerDeur = Bounce();
 Bounce debouncerWC = Bounce();
 
-AsyncDelay delay_8s;
-AsyncDelay delay_10s;
+AsyncDelay delay_30s;
+AsyncDelay delay_50s;
+AsyncDelay delay_55s;
+AsyncDelay delay_60s;
 
 // Update these with values suitable for your network.
 byte mac[]    = {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, 0xED };
@@ -48,8 +50,7 @@ byte server[] = { 192, 168, 1, 30 };
 byte ip[]     = { 192, 168, 1, 99 };
 
 //
-#define ONE_WIRE_BUS 6
-#define ONE_WIRE_BUS2 7
+#define ONE_WIRE_BUS 7
 #define DEUR_PIN 8
 #define DEUR_DETECT 5
 int lastDeurState = HIGH;
@@ -73,15 +74,12 @@ AnalogMultiButton buttons(BUTTONS_PIN, BUTTONS_TOTAL, BUTTONS_VALUES);
 
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(ONE_WIRE_BUS);
-OneWire oneWire2(ONE_WIRE_BUS2);
 
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
-DallasTemperature sensors2(&oneWire2);
 
 #define DEUR_OPEN_TOPIC "domogik/in/deur"
-bool isNextReadSensors = true;
-bool isNextReadSensors2 = false;
+bool isNextReadsensors = true;
 
 // Assign the unique addresses of your 1-Wire temp sensors.
 // See the tutorial on how to obtain these addresses:
@@ -192,7 +190,6 @@ void setup()
   Serial.begin(9600);
   // Start up the library
   sensors.begin();
-  sensors2.begin();
 
   // set the resolution to 10 bit (good enough?)
   int resolution = 10;
@@ -206,14 +203,14 @@ void setup()
   sensors.setResolution(thermometer12, resolution);
   sensors.setResolution(thermometerT, resolution);
 
-  sensors2.setResolution(thermometer6, resolution);
-  sensors2.setResolution(thermometer5, resolution);
-  sensors2.setResolution(thermometer10, resolution);
-  sensors2.setResolution(thermometer11, resolution);
-  sensors2.setResolution(thermometer13, resolution);
-  sensors2.setResolution(thermometer14, resolution);
-  sensors2.setResolution(thermometer15, resolution);
-  sensors2.setResolution(thermometer16, resolution);
+  sensors.setResolution(thermometer6, resolution);
+  sensors.setResolution(thermometer5, resolution);
+  sensors.setResolution(thermometer10, resolution);
+  sensors.setResolution(thermometer11, resolution);
+  sensors.setResolution(thermometer13, resolution);
+  sensors.setResolution(thermometer14, resolution);
+  sensors.setResolution(thermometer15, resolution);
+  sensors.setResolution(thermometer16, resolution);
 
   //input
   pinMode(DEUR_DETECT, INPUT_PULLUP);
@@ -242,8 +239,10 @@ void setup()
 
   //Sends the initial pin state to the Wiegand library
   pinStateChanged();
-  delay_8s.start(8000, AsyncDelay::MILLIS);
-  delay_10s.start(10000, AsyncDelay::MILLIS);
+  delay_30s.start(30000, AsyncDelay::MILLIS);
+  delay_50s.start(50000, AsyncDelay::MILLIS);
+  delay_55s.start(55000, AsyncDelay::MILLIS);
+  delay_60s.start(60000, AsyncDelay::MILLIS);
 }
 
 void reconnect() {
@@ -254,7 +253,7 @@ void reconnect() {
     if (client.connect("arduinoClient")) {
       Serial.println("connected");
       // Once connected, publish an announcement...
-      //client.publish("domogik/helloWorld","1");
+      client.publish("domogik/arduinoHouse","booted");
       // ... and resubscribe
       client.subscribe("domogik/in/#");
     } else {
@@ -291,8 +290,6 @@ void pinStateChanged() {
   wiegand.setPin0State(digitalRead(PIN_D0));
   wiegand.setPin1State(digitalRead(PIN_D1));
 }
-
-int tempSensorReads = 0;
 
 // Notifies when a reader has been connected or disconnected.
 // Instead of a message, the seconds parameter can be anything you want -- Whatever you specify on `wiegand.onStateChange()`
@@ -368,77 +365,38 @@ void loop()
     client.publish("domogik/buttonan3", "0");
   }
 
-  if (delay_8s.isExpired()) {
-    if (isNextReadSensors){
+  if (delay_30s.isExpired()) {
+    if (isNextReadsensors) {
       sensors.requestTemperatures();
-      isNextReadSensors = false;
+      isNextReadsensors = false;
     }
-    if (isNextReadSensors2){
-      sensors2.requestTemperatures();
-      isNextReadSensors2 = false;
-    }
-    delay_8s.repeat(); // Count from when the delay expired, not now
+    delay_30s.repeat(); // Count from when the delay expired, not now
   }
-  if (delay_10s.isExpired()) {
-    tempSensorReads = tempSensorReads + 1;
-    int currentTempSensor = tempSensorReads % 13;
-    //char buffer[7];         //the ASCII of the integer will be stored in this char array
-    //itoa(currentTempSensor,buffer,10);
-    //client.publish("domogik/currentTempSensor", buffer);
-    switch (currentTempSensor) {
-    case 0:
-      printTemperature(sensors, thermometer7, "domogik/berging", 0.5, 0);
-      isNextReadSensors = true;
-      break;
-    case 1:
-      printTemperature(sensors, thermometerT, "domogik/tempT", 0, 0);
-      isNextReadSensors2 = true;
-      break;
-    case 2:
-      printTemperature(sensors2, thermometer5, "domogik/traponder", -0.4, 0);
-      isNextReadSensors2 = true;
-      break;
-    case 3:
-      printTemperature(sensors2, thermometer10, "domogik/inkom", 0, 0); //inkom
-      isNextReadSensors2 = true;
-      break;
-    case 4:
-      printTemperature(sensors2, thermometer11, "domogik/wconder", 0.3, 0); //wc onder
-      isNextReadSensors2 = true;
-      break;
-    case 5:
-      printTemperature(sensors2, thermometer9, "domogik/paulien", 0, 0);//paulien
-      isNextReadSensors2 = true;
-      break;
-    case 6:
-      printTemperature(sensors2, thermometer3, "domogik/wcboven", 0.3, 0); //wc boven
-      isNextReadSensors2 = true;
-      break;
-    case 7:
-      printTemperature(sensors2, thermometer12, "domogik/living", 0.2, 0);
-      isNextReadSensors2 = true;
-      break;
-    case 8:
-      printTemperature(sensors2, thermometer6, "domogik/trapboven", 0.4, 0);
-      break;
-    case 9:
-      printTemperature(sensors2, thermometer13, "domogik/slpkberg", 0, 0);
-      isNextReadSensors2 = true;
-      break;
-    case 10:
-      printTemperature(sensors2, thermometer15, "domogik/badk", 0.8, 0);
-      isNextReadSensors2 = true;
-      break;
-    case 11:
-      printTemperature(sensors2, thermometer16, "domogik/vide", 0, 0);
-      isNextReadSensors2 = true;
-      break;
-    case 12:
-      printTemperature(sensors2, thermometer14, "domogik/masterslpk", 0.3, 0);
-      isNextReadSensors = true;
-      break;                            
-    }
-    delay_10s.repeat();
+  if (delay_50s.isExpired()) {
+    printTemperature(sensors, thermometer7, "domogik/berging", 0.5, 0);
+    printTemperature(sensors, thermometerT, "domogik/tempT", 0, 0);
+    printTemperature(sensors, thermometer5, "domogik/traponder", -0.4, 0);
+    printTemperature(sensors, thermometer10, "domogik/inkom", 0, 0); //inkom
+    delay_50s.repeat();
+  }
+  if (delay_55s.isExpired()) {
+    printTemperature(sensors, thermometer11, "domogik/wconder", 0.3, 0); //wc onder
+    printTemperature(sensors, thermometer9, "domogik/paulien", 0, 0);//paulien
+    printTemperature(sensors, thermometer3, "domogik/wcboven", 0.3, 0); //wc boven
+    printTemperature(sensors, thermometer4, "domogik/keuken", -0.8, 0);
+    printTemperature(sensors, thermometer12, "domogik/living", 0.2, 0);
+    delay_55s.repeat();
+  }
+  if (delay_60s.isExpired()) {
+    printTemperature(sensors, thermometer6, "domogik/trapboven", 0.4, 0);
+    printTemperature(sensors, thermometer13, "domogik/slpkberg", 0, 0);
+    printTemperature(sensors, thermometer15, "domogik/badk", 0.8, 0);
+    printTemperature(sensors, thermometer16, "domogik/vide", 0, 0);
+    printTemperature(sensors, thermometer14, "domogik/masterslpk", 0.3, 0);
+
+    isNextReadsensors = true;
+    delay_30s.start(30000, AsyncDelay::MILLIS);
+    delay_60s.repeat();
   }
   client.loop();
 }
