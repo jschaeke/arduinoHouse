@@ -24,6 +24,10 @@
 
   Pins 2->7 are used as input (switch) detection. Their state are published on domogik/relayArduinoPin1
 
+  A MQ2 smoke sensor on A0
+  https://create.arduino.cc/projecthub/Aritro/smoke-detection-using-mq-2-gas-sensor-79c54a
+
+
 */
 #include <Ethernet.h>
 #include <PubSubClient.h>
@@ -42,6 +46,7 @@ char msg[50];
 int value = 0;
 AsyncDelay delay_400ms;
 AsyncDelay delay_30s;
+AsyncDelay delay_5s;
 
 //MutuallyExclude the 'on' state between pairs of relays (for shutter to prevent up and down at the same time)
 //ask R1 to turn on while R2 = on -> turns off R2 first (and broadcasts 'domogik/in/relay/r2 0')
@@ -68,6 +73,8 @@ int pinCount = 32;
 #define PIN_DETECT_4 5
 #define PIN_DETECT_5 6
 #define PIN_DETECT_6 7
+#define SMOKE_PIN A0
+
 Bounce debounce1 = Bounce();
 Bounce debounce2 = Bounce();
 Bounce debounce3 = Bounce();
@@ -97,7 +104,9 @@ void setup_ethernet() {
 void delayTimers() {
   delay_400ms.start(400, AsyncDelay::MILLIS);
   delay_30s.start(30000, AsyncDelay::MILLIS);
+  delay_5s.start(5000, AsyncDelay::MILLIS);
 }
+
 void  publishStates() {
   for (int thisPin = 0; thisPin < pinCount; thisPin++) {
     char* state = relayStates[thisPin] == HIGH ? "0" : "1";
@@ -238,6 +247,7 @@ void setup() {
   }
   pinMode(13, OUTPUT);
 
+
   //init state relayboard
   //turnAllOff();
 
@@ -250,6 +260,7 @@ void setup() {
   pinMode(PIN_DETECT_4, INPUT_PULLUP);
   pinMode(PIN_DETECT_5, INPUT_PULLUP);
   pinMode(PIN_DETECT_6, INPUT_PULLUP);
+  pinMode(SMOKE_PIN, INPUT);
   debounce1.attach(PIN_DETECT_1);
   debounce2.attach(PIN_DETECT_2);
   debounce3.attach(PIN_DETECT_3);
@@ -280,6 +291,15 @@ void loop() {
   if (!client.connected()) {
     reconnect();
   }
+
+  if (delay_5s.isExpired()) {
+    int analogSensor = analogRead(SMOKE_PIN);
+    char bufferSensor[6];
+    sprintf(bufferSensor, "%d", analogSensor);
+    client.publish("domogik/smoke", bufferSensor);
+    delay_5s.repeat();
+  }
+
 
   if (delay_400ms.isExpired()) {
     setStates();
