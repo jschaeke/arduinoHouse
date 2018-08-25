@@ -219,8 +219,7 @@ void setup()
   debouncerDeur.interval(50);
 
   //input
-  pinMode(WC_DETECT, INPUT);
-  digitalWrite(WC_DETECT, LOW);
+  pinMode(WC_DETECT, INPUT_PULLUP);
   // After setting up the button, setup the Bounce instance :
   debouncerWC.attach(WC_DETECT);
   debouncerWC.interval(10);
@@ -228,6 +227,7 @@ void setup()
 
   //Install listeners and initialize Wiegand reader
   wiegand.onReceive(receivedData, "Card readed: ");
+  
   wiegand.onStateChange(stateChanged, "State changed: ");
   wiegand.begin(WIEGAND_LENGTH_AUTO);
 
